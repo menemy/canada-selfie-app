@@ -9,6 +9,8 @@ A fun webcam application with Canadian-themed effects, filters, and AI-powered b
 
 Take amazing selfies with maple leaves, snow effects, hockey sticks, and iconic Canadian backgrounds. Show your Canadian pride, eh! 🇨🇦
 
+![Canada Selfie App Screenshot](screenshots/app-screenshot.png)
+
 ## Quick Start
 
 1. Install Python 3.7+
