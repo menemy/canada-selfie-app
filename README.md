@@ -11,6 +11,15 @@ Take amazing selfies with maple leaves, snow effects, hockey sticks, and iconic 
 
 ![Canada Selfie App Screenshot](screenshots/app-screenshot.png)
 
+## ⚠️ Important Notice
+
+**First launch may take 1-2 minutes!** The app needs to:
+- Download AI model for background removal (~180MB on first run)
+- Request camera permissions
+- Initialize video processing
+
+Please be patient and wait for the window to appear. Subsequent launches will be much faster.
+
 ## Quick Start
 
 1. Install Python 3.7+
