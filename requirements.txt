@@ -1,0 +1,7 @@
+PyQt5>=5.15.0
+opencv-python>=4.5.0
+numpy>=1.21.0
+rembg>=2.0.50
+onnxruntime>=1.16.0
+pyinstaller>=5.0
+sentry-sdk>=1.40.0

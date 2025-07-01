@@ -1,0 +1,199 @@
+name: 🍁 Build and Release with Sentry
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  SENTRY_ORG: "maksimnagaev"
+  SENTRY_PROJECT: "canada-selfie-app"
+  SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+
+permissions:
+  contents: write  # Needed to create releases
+
+jobs:
+  test-matrix:
+    name: Test Python ${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    if: github.event_name == 'pull_request'
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.9', '3.10', '3.11']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run tests
+      run: |
+        python -c "import canada_selfie_app; print('Import successful')"
+
+  build-macos:
+    name: 🍎 Build macOS DMG
+    runs-on: macos-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Required for Sentry release
+      
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: 📦 Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller sentry-cli
+        
+    - name: 🔨 Build macOS App
+      run: |
+        pyinstaller -y canada_selfie.spec
+        
+    - name: 🎨 Create DMG
+      run: |
+        chmod +x build_dmg.sh
+        ./build_dmg.sh
+        # Rename with version
+        VERSION=${GITHUB_REF#refs/tags/}
+        mv Canada-Selfie-App.dmg Canada-Selfie-App-${VERSION}-macOS.dmg
+
+    - name: Create Sentry release
+      if: env.SENTRY_AUTH_TOKEN != ''
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        sentry-cli releases new "canada-selfie-app@${VERSION}"
+        sentry-cli releases set-commits "canada-selfie-app@${VERSION}" --auto
+        sentry-cli releases files "canada-selfie-app@${VERSION}" upload-sourcemaps . \
+          --ext py \
+          --ignore node_modules \
+          --ignore venv \
+          --ignore .git
+        
+    - name: 📤 Upload DMG Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Canada-Selfie-App-macOS
+        path: Canada-Selfie-App-${{ github.ref_name }}-macOS.dmg
+        
+  build-windows:
+    name: 🖥️ Build Windows EXE
+    runs-on: windows-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Required for Sentry release
+      
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: 📦 Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller sentry-cli
+        
+    - name: 🔨 Build Windows EXE
+      run: |
+        pyinstaller -y canada_selfie.spec
+        # Rename with version
+        move dist\CanadaSelfieApp.exe dist\Canada-Selfie-App-${{ github.ref_name }}-Windows.exe
+
+    - name: Create Sentry release
+      if: env.SENTRY_AUTH_TOKEN != ''
+      shell: bash
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        sentry-cli releases new "canada-selfie-app@${VERSION}"
+        sentry-cli releases set-commits "canada-selfie-app@${VERSION}" --auto
+        sentry-cli releases files "canada-selfie-app@${VERSION}" upload-sourcemaps . \
+          --ext py \
+          --ignore node_modules \
+          --ignore venv \
+          --ignore .git
+        
+    - name: 📤 Upload EXE Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Canada-Selfie-App-Windows
+        path: dist/Canada-Selfie-App-${{ github.ref_name }}-Windows.exe
+        
+  create-release:
+    name: 🚀 Create GitHub Release
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: 📥 Download all artifacts
+      uses: actions/download-artifact@v4
+      
+    - name: 🏷️ Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        name: Canada Selfie App ${{ github.ref_name }}
+        body: |
+          🍁 **Canada Selfie App ${{ github.ref_name }}** 🍁
+          
+          Take amazing Canadian-themed selfies with this fun webcam app!
+          
+          ## 📥 Downloads
+          
+          - **macOS**: Canada-Selfie-App-${{ github.ref_name }}-macOS.dmg
+          - **Windows**: Canada-Selfie-App-${{ github.ref_name }}-Windows.exe (portable)
+          
+          ## 🆕 Features
+          - 8 Canadian effects (maple rain, snow, hockey, etc.)
+          - 7 background scenes (Toronto, Niagara Falls, etc.)
+          - AI-powered background removal
+          - Multi-camera support
+          - Secret easter eggs! 🎆
+          - Sentry error tracking and performance monitoring
+          
+          ## 🚀 Installation
+          
+          **macOS**: Open DMG and drag to Applications
+          **Windows**: Run CanadaSelfieApp.exe directly
+          
+          ---
+          Made with ❤️ and 🇨🇦 Canadian pride!
+        files: |
+          Canada-Selfie-App-macOS/Canada-Selfie-App-${{ github.ref_name }}-macOS.dmg
+          Canada-Selfie-App-Windows/Canada-Selfie-App-${{ github.ref_name }}-Windows.exe
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Finalize Sentry release
+      if: env.SENTRY_AUTH_TOKEN != ''
+      run: |
+        pip install sentry-cli
+        VERSION=${GITHUB_REF#refs/tags/}
+        sentry-cli releases finalize "canada-selfie-app@${VERSION}"
+        sentry-cli releases deploys "canada-selfie-app@${VERSION}" new -e production
